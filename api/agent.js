@@ -1,8 +1,8 @@
 var AGENTS = {
   1: {
     name: "Chuyên gia kho",
-    provider: "gemini",
-    model: "gemini-1.5-flash-latest",
+    provider: "openrouter",
+    model: "google/gemini-2.0-flash-001",
     systemPrompt: "Ban la Chuyen gia kho van, chuyen xay dung giai phap kho thong minh cho kho hang logistics/phan phoi (kho van, xuat nhap hang).\n" +
       "Nhiem vu: dua ra de xuat cu the, thuc te, co tinh xay dung - ve layout, quy trinh nhap-xuat, luan chuyen hang, toi uu khong gian, cong nghe WMS, an toan kho...\n" +
       "Neu day la lan lam lai sau khi bi Truong phong kho tu choi, PHAI doc ky ly do tu choi va dieu chinh de xuat cho phu hop, neu ro da thay doi gi so voi ban truoc.\n" +
@@ -39,8 +39,8 @@ var AGENTS = {
   },
   5: {
     name: "Giám đốc kho",
-    provider: "gemini",
-    model: "gemini-1.5-flash-latest",
+    provider: "openrouter",
+    model: "google/gemini-2.0-flash-001",
     systemPrompt: "Ban la Giam doc kho, tu duy chien luoc, dua ra QUYET DINH CUOI CUNG dua tren toan bo y kien cua Chuyen gia kho, Truong phong kho, Ke toan truong, va Tro ly giam doc.\n" +
       "Khong lap lai y cua 4 nguoi tren - hay TONG HOP va QUYET.\n" +
       "Neu ro: phuong an cuoi cung la gi, ly do chon, va buoc hanh dong cu the tiep theo.\n" +
@@ -48,29 +48,6 @@ var AGENTS = {
       "Ngon ngu thang than, di thang vao trong tam."
   }
 };
-
-async function callGemini(model, systemPrompt, userText) {
-  var apiKey = process.env.GEMINI_API_KEY;
-  var url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
-  var res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey
-    },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userText }] }]
-    })
-  });
-  var data = await res.json();
-  if (!res.ok) {
-    throw new Error("Gemini loi: " + (data.error && data.error.message ? data.error.message : res.status));
-  }
-  var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
-  if (!parts) return "(Khong co phan hoi)";
-  return parts.map(function(p) { return p.text; }).join("");
-}
 
 async function callGroq(model, systemPrompt, userText) {
   var apiKey = process.env.GROQ_API_KEY;
@@ -116,7 +93,7 @@ async function callOpenRouter(model, systemPrompt, userText) {
   var data = await res.json();
   if (!res.ok) {
     var msg = (data.error && data.error.message) ? data.error.message : res.status;
-    throw new Error("OpenRouter loi: " + msg + ". Model co the da het han free - kiem tra lai tai openrouter.ai/models?fmt=free");
+    throw new Error("OpenRouter loi: " + msg);
   }
   return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "(Khong co phan hoi)";
 }
@@ -137,9 +114,7 @@ module.exports = async (req, res) => {
     }
 
     var text;
-    if (agent.provider === "gemini") {
-      text = await callGemini(agent.model, agent.systemPrompt, userText);
-    } else if (agent.provider === "groq") {
+    if (agent.provider === "groq") {
       text = await callGroq(agent.model, agent.systemPrompt, userText);
     } else if (agent.provider === "openrouter") {
       text = await callOpenRouter(agent.model, agent.systemPrompt, userText);
