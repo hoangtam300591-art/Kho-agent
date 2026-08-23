@@ -2,7 +2,7 @@ var AGENTS = {
   1: {
     name: "Chuyên gia kho",
     provider: "gemini",
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash-latest",
     systemPrompt: "Ban la Chuyen gia kho van, chuyen xay dung giai phap kho thong minh cho kho hang logistics/phan phoi (kho van, xuat nhap hang).\n" +
       "Nhiem vu: dua ra de xuat cu the, thuc te, co tinh xay dung - ve layout, quy trinh nhap-xuat, luan chuyen hang, toi uu khong gian, cong nghe WMS, an toan kho...\n" +
       "Neu day la lan lam lai sau khi bi Truong phong kho tu choi, PHAI doc ky ly do tu choi va dieu chinh de xuat cho phu hop, neu ro da thay doi gi so voi ban truoc.\n" +
@@ -40,7 +40,7 @@ var AGENTS = {
   5: {
     name: "Giám đốc kho",
     provider: "gemini",
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash-latest",
     systemPrompt: "Ban la Giam doc kho, tu duy chien luoc, dua ra QUYET DINH CUOI CUNG dua tren toan bo y kien cua Chuyen gia kho, Truong phong kho, Ke toan truong, va Tro ly giam doc.\n" +
       "Khong lap lai y cua 4 nguoi tren - hay TONG HOP va QUYET.\n" +
       "Neu ro: phuong an cuoi cung la gi, ly do chon, va buoc hanh dong cu the tiep theo.\n" +
@@ -152,4 +152,3 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: err.message || "Loi khong xac dinh" });
   }
 };
-      
