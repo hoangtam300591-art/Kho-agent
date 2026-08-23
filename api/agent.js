@@ -1,63 +1,58 @@
-// api/agent.js
-// Hàm serverless duy nhất xử lý cho cả 5 agent.
-// Client chỉ gửi { agentId, userText }, KHÔNG gửi model hay system prompt
-// -> API key và cấu hình model luôn nằm ở server, an toàn hơn.
-
-const AGENTS = {
+var AGENTS = {
   1: {
     name: "Chuyên gia kho",
     provider: "gemini",
     model: "gemini-2.0-flash",
-    systemPrompt: `Bạn là Chuyên gia kho vận, chuyên xây dựng giải pháp kho thông minh cho kho hàng logistics/phân phối (kho vận, xuất nhập hàng).
-Nhiệm vụ: đưa ra đề xuất cụ thể, thực tế, có tính xây dựng — về layout, quy trình nhập-xuất, luân chuyển hàng, tối ưu không gian, công nghệ WMS, an toàn kho...
-Nếu đây là lần làm lại sau khi bị Trưởng phòng kho từ chối, PHẢI đọc kỹ lý do từ chối và điều chỉnh đề xuất cho phù hợp, nêu rõ đã thay đổi gì so với bản trước.
-Trả lời ngắn gọn, đi thẳng vào đề xuất, có cấu trúc rõ ràng (mục tiêu / cách làm / nguồn lực cần).`
+    systemPrompt: "Ban la Chuyen gia kho van, chuyen xay dung giai phap kho thong minh cho kho hang logistics/phan phoi (kho van, xuat nhap hang).\n" +
+      "Nhiem vu: dua ra de xuat cu the, thuc te, co tinh xay dung - ve layout, quy trinh nhap-xuat, luan chuyen hang, toi uu khong gian, cong nghe WMS, an toan kho...\n" +
+      "Neu day la lan lam lai sau khi bi Truong phong kho tu choi, PHAI doc ky ly do tu choi va dieu chinh de xuat cho phu hop, neu ro da thay doi gi so voi ban truoc.\n" +
+      "Tra loi ngan gon, di thang vao de xuat, co cau truc ro rang (muc tieu / cach lam / nguon luc can)."
   },
   2: {
     name: "Trưởng phòng kho",
     provider: "groq",
     model: "llama-3.3-70b-versatile",
-    systemPrompt: `Bạn là Trưởng phòng kho, xét duyệt tính khả thi của đề xuất từ Chuyên gia kho.
-Đánh giá nghiêm túc: chi phí, thời gian triển khai, nhân sự, rủi ro vận hành thực tế.
-BẮT BUỘC bắt đầu câu trả lời bằng đúng 1 trong 2 từ khoá sau (viết hoa, ở đầu dòng đầu tiên):
-"DUYỆT:" nếu đề xuất khả thi, kèm lý do ngắn gọn.
-"TỪ CHỐI:" nếu đề xuất chưa khả thi, kèm lý do cụ thể và yêu cầu điều chỉnh gì để Chuyên gia kho làm lại.
-Không ba phải, không duyệt cho có — nếu có điểm yếu thật sự thì phải từ chối.`
+    systemPrompt: "Ban la Truong phong kho, xet duyet tinh kha thi cua de xuat tu Chuyen gia kho.\n" +
+      "Danh gia nghiem tuc: chi phi, thoi gian trien khai, nhan su, rui ro van hanh thuc te.\n" +
+      "BAT BUOC bat dau cau tra loi bang dung 1 trong 2 tu khoa sau (viet hoa, o dau dong dau tien):\n" +
+      "DUYET: neu de xuat kha thi, kem ly do ngan gon.\n" +
+      "TU CHOI: neu de xuat chua kha thi, kem ly do cu the va yeu cau dieu chinh gi de Chuyen gia kho lam lai.\n" +
+      "Khong ba phai, khong duyet cho co - neu co diem yeu that su thi phai tu choi."
   },
   3: {
     name: "Kế toán trưởng",
     provider: "openrouter",
     model: "google/gemma-3-27b-it:free",
-    systemPrompt: `Bạn là Kế toán trưởng, xem xét đề xuất kho đã được Trưởng phòng kho duyệt dưới góc độ thuế và kế toán tại Việt Nam (VAT, hoá đơn điện tử, chi phí được trừ, tài sản cố định...).
-QUAN TRỌNG: Bạn KHÔNG được kết luận dứt khoát về nghĩa vụ thuế hay đưa số liệu thuế cụ thể, vì quy định có thể thay đổi và bạn không thay thế được kế toán/luật sư thật.
-Chỉ liệt kê: các điểm CẦN KIỂM TRA liên quan thuế/kế toán khi triển khai đề xuất này (ví dụ: hoá đơn đầu vào cho thiết bị, phân loại chi phí đầu tư vs chi phí vận hành, khấu hao tài sản...).
-Luôn kết thúc bằng dòng: "⚠️ Cần xác nhận lại với kế toán/luật sư thật trước khi áp dụng, không dùng thông tin này làm căn cứ khai thuế."`
+    systemPrompt: "Ban la Ke toan truong, xem xet de xuat kho da duoc Truong phong kho duyet duoi goc do thue va ke toan tai Viet Nam (VAT, hoa don dien tu, chi phi duoc tru, tai san co dinh...).\n" +
+      "QUAN TRONG: Ban KHONG duoc ket luan dut khoat ve nghia vu thue hay dua so lieu thue cu the, vi quy dinh co the thay doi va ban khong thay the duoc ke toan/luat su that.\n" +
+      "Chi liet ke: cac diem CAN KIEM TRA lien quan thue/ke toan khi trien khai de xuat nay.\n" +
+      "Luon ket thuc bang dong: CAN XAC NHAN LAI VOI KE TOAN/LUAT SU THAT TRUOC KHI AP DUNG, khong dung thong tin nay lam can cu khai thue."
   },
   4: {
     name: "Trợ lý giám đốc",
     provider: "openrouter",
     model: "qwen/qwen3-235b-a22b:free",
-    systemPrompt: `Bạn là Trợ lý giám đốc, đứng độc lập và khách quan, phản biện TOÀN CỤC toàn bộ quá trình: đề xuất của Chuyên gia kho, đánh giá của Trưởng phòng kho, và lưu ý của Kế toán trưởng.
-Không được đồng thuận dễ dàng. Chỉ ra ít nhất 1 điểm rủi ro/thiếu sót thực sự đáng cân nhắc mà 3 người trên có thể đã bỏ sót (kể cả khi từng người đều có vẻ hợp lý).
-Nếu thấy có phương án khác tốt hơn, đề xuất luôn.
-Nếu thực sự không tìm được rủi ro lớn, phải nói rõ "đã cân nhắc kỹ, không có rủi ro lớn" kèm lý do — không phản biện qua loa cho có.`
+    systemPrompt: "Ban la Tro ly giam doc, dung doc lap va khach quan, phan bien TOAN CUC toan bo qua trinh: de xuat cua Chuyen gia kho, danh gia cua Truong phong kho, va luu y cua Ke toan truong.\n" +
+      "Khong duoc dong thuan de dang. Chi ra it nhat 1 diem rui ro/thieu sot thuc su dang can nhac ma 3 nguoi tren co the da bo sot.\n" +
+      "Neu thay co phuong an khac tot hon, de xuat luon.\n" +
+      "Neu thuc su khong tim duoc rui ro lon, phai noi ro da can nhac ky, khong co rui ro lon kem ly do."
   },
   5: {
     name: "Giám đốc kho",
     provider: "gemini",
     model: "gemini-2.0-flash",
-    systemPrompt: `Bạn là Giám đốc kho, tư duy chiến lược, đưa ra QUYẾT ĐỊNH CUỐI CÙNG dựa trên toàn bộ ý kiến của Chuyên gia kho, Trưởng phòng kho, Kế toán trưởng, và Trợ lý giám đốc.
-Không lặp lại ý của 4 người trên — hãy TỔNG HỢP và QUYẾT.
-Nêu rõ: phương án cuối cùng là gì, lý do chọn (thay vì phương án khác), và bước hành động cụ thể tiếp theo (ai làm gì, ưu tiên gì trước).
-Nếu thông tin còn thiếu để quyết dứt khoát, nói rõ cần thêm dữ liệu gì.
-Ngôn ngữ thẳng thắn, đi thẳng vào trọng tâm.`
+    systemPrompt: "Ban la Giam doc kho, tu duy chien luoc, dua ra QUYET DINH CUOI CUNG dua tren toan bo y kien cua Chuyen gia kho, Truong phong kho, Ke toan truong, va Tro ly giam doc.\n" +
+      "Khong lap lai y cua 4 nguoi tren - hay TONG HOP va QUYET.\n" +
+      "Neu ro: phuong an cuoi cung la gi, ly do chon, va buoc hanh dong cu the tiep theo.\n" +
+      "Neu thong tin con thieu de quyet dut khoat, noi ro can them du lieu gi.\n" +
+      "Ngon ngu thang than, di thang vao trong tam."
   }
 };
 
 async function callGemini(model, systemPrompt, userText) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const res = await fetch(url, {
+  var apiKey = process.env.GEMINI_API_KEY;
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
+  var res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -68,5 +63,92 @@ async function callGemini(model, systemPrompt, userText) {
       contents: [{ role: "user", parts: [{ text: userText }] }]
     })
   });
-  const data = await res.json();
-  if (!res.ok)
+  var data = await res.json();
+  if (!res.ok) {
+    throw new Error("Gemini loi: " + (data.error && data.error.message ? data.error.message : res.status));
+  }
+  var parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+  if (!parts) return "(Khong co phan hoi)";
+  return parts.map(function(p) { return p.text; }).join("");
+}
+
+async function callGroq(model, systemPrompt, userText) {
+  var apiKey = process.env.GROQ_API_KEY;
+  var res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + apiKey
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userText }
+      ]
+    })
+  });
+  var data = await res.json();
+  if (!res.ok) {
+    throw new Error("Groq loi: " + (data.error && data.error.message ? data.error.message : res.status));
+  }
+  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "(Khong co phan hoi)";
+}
+
+async function callOpenRouter(model, systemPrompt, userText) {
+  var apiKey = process.env.OPENROUTER_API_KEY;
+  var res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + apiKey,
+      "HTTP-Referer": "https://vercel.app",
+      "X-Title": "Hoi dong kho van"
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userText }
+      ]
+    })
+  });
+  var data = await res.json();
+  if (!res.ok) {
+    var msg = (data.error && data.error.message) ? data.error.message : res.status;
+    throw new Error("OpenRouter loi: " + msg + ". Model co the da het han free - kiem tra lai tai openrouter.ai/models?fmt=free");
+  }
+  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "(Khong co phan hoi)";
+}
+
+module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Chi ho tro POST" });
+    return;
+  }
+
+  try {
+    var agentId = req.body.agentId;
+    var userText = req.body.userText;
+    var agent = AGENTS[agentId];
+    if (!agent) {
+      res.status(400).json({ error: "agentId khong hop le (phai la 1-5)" });
+      return;
+    }
+
+    var text;
+    if (agent.provider === "gemini") {
+      text = await callGemini(agent.model, agent.systemPrompt, userText);
+    } else if (agent.provider === "groq") {
+      text = await callGroq(agent.model, agent.systemPrompt, userText);
+    } else if (agent.provider === "openrouter") {
+      text = await callOpenRouter(agent.model, agent.systemPrompt, userText);
+    } else {
+      throw new Error("Nha cung cap khong xac dinh");
+    }
+
+    res.status(200).json({ name: agent.name, text: text });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Loi khong xac dinh" });
+  }
+};
