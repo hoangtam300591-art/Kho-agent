@@ -1,6 +1,7 @@
 var AGENTS = {
   1: {
     name: "Chuyên gia kho",
+    provider: "gemini",
     systemPrompt: "Ban la Chuyen gia kho van, chuyen xay dung giai phap kho thong minh cho kho hang logistics/phan phoi (kho van, xuat nhap hang).\n" +
       "Nhiem vu: dua ra de xuat cu the, thuc te, co tinh xay dung - ve layout, quy trinh nhap-xuat, luan chuyen hang, toi uu khong gian, cong nghe WMS, an toan kho...\n" +
       "Neu day la lan lam lai sau khi bi Truong phong kho tu choi, PHAI doc ky ly do tu choi va dieu chinh de xuat cho phu hop, neu ro da thay doi gi so voi ban truoc.\n" +
@@ -8,6 +9,7 @@ var AGENTS = {
   },
   2: {
     name: "Trưởng phòng kho",
+    provider: "groq",
     systemPrompt: "Ban la Truong phong kho, xet duyet tinh kha thi cua de xuat tu Chuyen gia kho.\n" +
       "Danh gia nghiem tuc: chi phi, thoi gian trien khai, nhan su, rui ro van hanh thuc te.\n" +
       "BAT BUOC bat dau cau tra loi bang dung 1 trong 2 tu khoa sau (viet hoa, o dau dong dau tien):\n" +
@@ -17,6 +19,7 @@ var AGENTS = {
   },
   3: {
     name: "Kế toán trưởng",
+    provider: "gemini",
     systemPrompt: "Ban la Ke toan truong, xem xet de xuat kho da duoc Truong phong kho duyet duoi goc do thue va ke toan tai Viet Nam (VAT, hoa don dien tu, chi phi duoc tru, tai san co dinh...).\n" +
       "QUAN TRONG: Ban KHONG duoc ket luan dut khoat ve nghia vu thue hay dua so lieu thue cu the, vi quy dinh co the thay doi va ban khong thay the duoc ke toan/luat su that.\n" +
       "Chi liet ke: cac diem CAN KIEM TRA lien quan thue/ke toan khi trien khai de xuat nay.\n" +
@@ -24,6 +27,7 @@ var AGENTS = {
   },
   4: {
     name: "Trợ lý giám đốc",
+    provider: "groq",
     systemPrompt: "Ban la Tro ly giam doc, dung doc lap va khach quan, phan bien TOAN CUC toan bo qua trinh: de xuat cua Chuyen gia kho, danh gia cua Truong phong kho, va luu y cua Ke toan truong.\n" +
       "Khong duoc dong thuan de dang. Chi ra it nhat 1 diem rui ro/thieu sot thuc su dang can nhac ma 3 nguoi tren co the da bo sot.\n" +
       "Neu thay co phuong an khac tot hon, de xuat luon.\n" +
@@ -31,6 +35,7 @@ var AGENTS = {
   },
   5: {
     name: "Giám đốc kho",
+    provider: "gemini",
     systemPrompt: "Ban la Giam doc kho, tu duy chien luoc, dua ra QUYET DINH CUOI CUNG dua tren toan bo y kien cua Chuyen gia kho, Truong phong kho, Ke toan truong, va Tro ly giam doc.\n" +
       "Khong lap lai y cua 4 nguoi tren - hay TONG HOP va QUYET.\n" +
       "Neu ro: phuong an cuoi cung la gi, ly do chon, va buoc hanh dong cu the tiep theo.\n" +
@@ -39,74 +44,73 @@ var AGENTS = {
   }
 };
 
-async function callAI(systemPrompt, userText) {
-  var groqKey = process.env.GROQ_API_KEY;
-  var groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+async function callGemini(systemPrompt, userText) {
+  var apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Chua cau hinh GEMINI_API_KEY trong Vercel Environment Variables");
 
-  if (groqKey) {
-    for (var i = 0; i < groqModels.length; i++) {
-      try {
-        var res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + groqKey
-          },
-          body: JSON.stringify({
-            model: groqModels[i],
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userText }
-            ]
-          })
-        });
-        var data = await res.json();
-        if (res.ok && data.choices && data.choices[0] && data.choices[0].message) {
-          return data.choices[0].message.content;
-        }
-      } catch (e) {
-        // Tự động chuyển model kế tiếp nếu có lỗi
+  var models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
+  var lastError = "";
+
+  for (var i = 0; i < models.length; i++) {
+    try {
+      var url = "https://generativelanguage.googleapis.com/v1beta/models/" + models[i] + ":generateContent?key=" + apiKey;
+      var res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: "user", parts: [{ text: userText }] }]
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+        return data.candidates[0].content.parts.map(function(p) { return p.text; }).join("");
       }
+      if (data.error && data.error.message) {
+        lastError = data.error.message;
+      }
+    } catch (e) {
+      lastError = e.message;
     }
   }
+  throw new Error("Gemini loi: " + lastError);
+}
 
-  var openRouterKey = process.env.OPENROUTER_API_KEY;
-  var openRouterModels = [
-    "google/gemma-2-9b-it:free",
-    "qwen/qwen-2.5-72b-instruct:free",
-    "meta-llama/llama-3.3-70b-instruct"
-  ];
+async function callGroq(systemPrompt, userText) {
+  var apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error("Chua cau hinh GROQ_API_KEY trong Vercel Environment Variables");
 
-  if (openRouterKey) {
-    for (var j = 0; j < openRouterModels.length; j++) {
-      try {
-        var resOR = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + openRouterKey,
-            "HTTP-Referer": "https://vercel.app",
-            "X-Title": "Hoi dong kho van"
-          },
-          body: JSON.stringify({
-            model: openRouterModels[j],
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userText }
-            ]
-          })
-        });
-        var dataOR = await resOR.json();
-        if (resOR.ok && dataOR.choices && dataOR.choices[0] && dataOR.choices[0].message) {
-          return dataOR.choices[0].message.content;
-        }
-      } catch (e) {
-        // Tự động chuyển model kế tiếp nếu có lỗi
+  var models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+  var lastError = "";
+
+  for (var i = 0; i < models.length; i++) {
+    try {
+      var res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + apiKey
+        },
+        body: JSON.stringify({
+          model: models[i],
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userText }
+          ]
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.choices && data.choices[0] && data.choices[0].message) {
+        return data.choices[0].message.content;
       }
+      if (data.error && data.error.message) {
+        lastError = data.error.message;
+      }
+    } catch (e) {
+      lastError = e.message;
     }
   }
-
-  throw new Error("Không thể kết nối dịch vụ AI. Vui lòng kiểm tra lại GROQ_API_KEY trong cài đặt Vercel.");
+  throw new Error("Groq loi: " + lastError);
 }
 
 module.exports = async (req, res) => {
@@ -124,10 +128,17 @@ module.exports = async (req, res) => {
       return;
     }
 
-    var text = await callAI(agent.systemPrompt, userText);
+    var text;
+    if (agent.provider === "gemini") {
+      text = await callGemini(agent.systemPrompt, userText);
+    } else if (agent.provider === "groq") {
+      text = await callGroq(agent.systemPrompt, userText);
+    } else {
+      throw new Error("Nha cung cap khong xac dinh");
+    }
+
     res.status(200).json({ name: agent.name, text: text });
   } catch (err) {
     res.status(500).json({ error: err.message || "Loi khong xac dinh" });
   }
 };
-                
