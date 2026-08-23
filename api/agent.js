@@ -46,9 +46,9 @@ var AGENTS = {
 
 async function callGemini(systemPrompt, userText) {
   var apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Chua cau hinh GEMINI_API_KEY trong Vercel Environment Variables");
+  if (!apiKey) throw new Error("Chua cau hinh GEMINI_API_KEY");
 
-  var models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
+  var models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
   var lastError = "";
 
   for (var i = 0; i < models.length; i++) {
@@ -58,8 +58,10 @@ async function callGemini(systemPrompt, userText) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userText }] }]
+          contents: [{
+            role: "user",
+            parts: [{ text: "VAI TRO CUA BAN:\n" + systemPrompt + "\n\nNOI DUNG CAN XU LY:\n" + userText }]
+          }]
         })
       });
       var data = await res.json();
@@ -73,12 +75,12 @@ async function callGemini(systemPrompt, userText) {
       lastError = e.message;
     }
   }
-  throw new Error("Gemini loi: " + lastError);
+  throw new Error(lastError || "Gemini API error");
 }
 
 async function callGroq(systemPrompt, userText) {
   var apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("Chua cau hinh GROQ_API_KEY trong Vercel Environment Variables");
+  if (!apiKey) throw new Error("Chua cau hinh GROQ_API_KEY");
 
   var models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
   var lastError = "";
@@ -110,7 +112,7 @@ async function callGroq(systemPrompt, userText) {
       lastError = e.message;
     }
   }
-  throw new Error("Groq loi: " + lastError);
+  throw new Error(lastError || "Groq API error");
 }
 
 module.exports = async (req, res) => {
@@ -128,17 +130,23 @@ module.exports = async (req, res) => {
       return;
     }
 
-    var text;
+    var text = "";
     if (agent.provider === "gemini") {
-      text = await callGemini(agent.systemPrompt, userText);
+      try {
+        text = await callGemini(agent.systemPrompt, userText);
+      } catch (geminiErr) {
+        text = await callGroq(agent.systemPrompt, userText);
+      }
     } else if (agent.provider === "groq") {
-      text = await callGroq(agent.systemPrompt, userText);
-    } else {
-      throw new Error("Nha cung cap khong xac dinh");
+      try {
+        text = await callGroq(agent.systemPrompt, userText);
+      } catch (groqErr) {
+        text = await callGemini(agent.systemPrompt, userText);
+      }
     }
 
     res.status(200).json({ name: agent.name, text: text });
   } catch (err) {
-    res.status(500).json({ error: err.message || "Loi khong xac dinh" });
+    res.status(500).json({ error: "Loi he thong: " + (err.message || "Khong the ket noi API") });
   }
 };
